@@ -1,0 +1,16 @@
+node_modules
+.env
+.env.*
+!.env.example
+dist
+client/dist
+server/dist
+*.db
+*.sqlite
+*.sqlite3
+.DS_Store
+.vite
+.venv
+*.log
+*.tsbuildinfo
+.vscode

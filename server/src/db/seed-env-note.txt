@@ -1,0 +1,1 @@
+The seed reads INITIAL_USERNAME and INITIAL_PASSWORD from .env. Defaults are preethi and 1226 for the private local account only.
