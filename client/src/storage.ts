@@ -1,6 +1,6 @@
 import type { AppData, DayOfWeek, LoveNote, Note, Subject, Task, TimetableSlot, WeeklyTimetable } from './types';
 
-const STORAGE_KEY = 'preethi_teacher_companion_v3';
+const STORAGE_KEY = 'preethi_teacher_companion_v4';
 const AUTH_KEY = 'preethi_auth_session';
 
 export const SLOTS_METADATA: { time: string; start: string; end: string; isLunch?: boolean }[] = [
@@ -107,7 +107,32 @@ const todayIso = new Date().toISOString().slice(0, 10);
 
 export const INITIAL_TASKS: Task[] = [];
 
-export const INITIAL_NOTES: Note[] = [];
+export const INITIAL_NOTES: Note[] = [
+  {
+    id: 'note-1',
+    title: 'Teaching spark: Start with real-life question',
+    content: "For next week's Gauss law intro, bring a small balloon and ask students about lines of force penetrating the surface. Makes the concept crystal clear!",
+    category: 'Teaching',
+    pinned: true,
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: 'note-2',
+    title: 'Lab items needing replacement',
+    content: 'Need 2 new connecting wire spools and 1 galvanometer with needle zero adjustment for Lab 1 table 3.',
+    category: 'Lab Prep',
+    pinned: false,
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: 'note-3',
+    title: 'Staff Meeting reminders',
+    content: 'Mid-term question papers submission due next Tuesday. Portions to cover before exams: Units 1, 2, and 3.',
+    category: 'Reminders',
+    pinned: false,
+    createdAt: new Date().toISOString(),
+  },
+];
 
 export function getInitialData(): AppData {
   return {
@@ -134,7 +159,7 @@ export function loadAppData(): AppData {
       tasks: Array.isArray(parsed.tasks) ? parsed.tasks : [],
       subjects: Array.isArray(parsed.subjects) && parsed.subjects.length ? parsed.subjects : INITIAL_SUBJECTS,
       timetable: parsed.timetable ?? INITIAL_TIMETABLE,
-      notes: Array.isArray(parsed.notes) ? parsed.notes : [],
+      notes: Array.isArray(parsed.notes) && parsed.notes.length ? parsed.notes : INITIAL_NOTES,
       loveNotes: [],
       attendanceLogs: [],
       lastActiveDate: parsed.lastActiveDate ?? todayIso,
