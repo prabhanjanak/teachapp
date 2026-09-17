@@ -3,10 +3,8 @@ export type View =
   | 'timetable'
   | 'tasks'
   | 'syllabus'
-  | 'desk'
   | 'notes'
   | 'break'
-  | 'lovenotes'
   | 'analytics';
 
 export type Priority = 'Low' | 'Medium' | 'High' | 'Urgent';

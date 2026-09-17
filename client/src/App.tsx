@@ -54,7 +54,6 @@ import type {
   AppData,
   AttendanceRecord,
   DayOfWeek,
-  LoveNote,
   Note,
   Priority,
   Subject,
@@ -72,18 +71,18 @@ import {
   getTodayDayCode,
   playGentleChime,
   triggerConfetti,
-  triggerHearts
+  triggerHearts,
+  triggerScreenHeartsExplosion
 } from './utils';
+import { getRandomPreethiQuote } from './quotes';
 
 export default function App() {
   const [token, setToken] = useState<string | null>(() => getAuthSession());
   const [view, setView] = useState<View>('dashboard');
   const [data, setData] = useState<AppData>(() => loadAppData());
   const [mobileNav, setMobileNav] = useState(false);
-  const [currentLoveNote, setCurrentLoveNote] = useState<LoveNote>(() => {
-    const list = data.loveNotes;
-    return list[Math.floor(Math.random() * list.length)];
-  });
+  const [pushQuote, setPushQuote] = useState<string>(() => getRandomPreethiQuote());
+  const [showHeartsCelebration, setShowHeartsCelebration] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Sync to localStorage
@@ -103,6 +102,11 @@ export default function App() {
   const handleLogin = (newToken: string) => {
     setAuthSession(newToken);
     setToken(newToken);
+    const freshQuote = getRandomPreethiQuote(pushQuote);
+    setPushQuote(freshQuote);
+    setShowHeartsCelebration(true);
+    triggerScreenHeartsExplosion();
+    playGentleChime('success');
     showToast('Welcome back, Preethi 💗');
   };
 
@@ -111,15 +115,12 @@ export default function App() {
     setToken(null);
   };
 
-  // Love note picker
-  const pickNewLoveNote = () => {
-    triggerHearts();
-    const otherNotes = data.loveNotes.filter((n) => n.id !== currentLoveNote.id);
-    const chosen = otherNotes.length
-      ? otherNotes[Math.floor(Math.random() * otherNotes.length)]
-      : data.loveNotes[0];
-    setCurrentLoveNote(chosen);
-    showToast('A little love from Dummu 💗');
+  // Push quote picker (cycles through 100 curated quotes with full screen hearts explosion)
+  const pickNewPushQuote = () => {
+    const next = getRandomPreethiQuote(pushQuote);
+    setPushQuote(next);
+    triggerScreenHeartsExplosion();
+    showToast('New love quote for you, Preethi 💗');
   };
 
   if (!token) {
@@ -162,8 +163,8 @@ export default function App() {
           <span className="mobile-brand">Preethi's Companion</span>
           <button
             className="icon-button"
-            onClick={pickNewLoveNote}
-            title="Surprise love note"
+            onClick={pickNewPushQuote}
+            title="Surprise love quote"
           >
             <Heart size={18} fill="var(--rose)" color="var(--rose)" />
           </button>
@@ -196,8 +197,8 @@ export default function App() {
         {view === 'dashboard' && (
           <DashboardView
             data={data}
-            loveNote={currentLoveNote}
-            onPickLoveNote={pickNewLoveNote}
+            pushQuote={pushQuote}
+            onPickPushQuote={pickNewPushQuote}
             setView={setView}
             updateData={updateData}
             showToast={showToast}
@@ -228,14 +229,6 @@ export default function App() {
           />
         )}
 
-        {view === 'desk' && (
-          <TeacherDeskView
-            attendanceLogs={data.attendanceLogs}
-            onUpdateAttendance={(logs) => updateData((prev) => ({ ...prev, attendanceLogs: logs }))}
-            showToast={showToast}
-          />
-        )}
-
         {view === 'notes' && (
           <QuickNotesView
             notes={data.notes}
@@ -245,26 +238,6 @@ export default function App() {
         )}
 
         {view === 'break' && <BreakView showToast={showToast} />}
-
-        {view === 'lovenotes' && (
-          <LoveNotesView
-            loveNotes={data.loveNotes}
-            onPickSurprise={pickNewLoveNote}
-            onAddLoveNote={(note) => {
-              updateData((prev) => ({ ...prev, loveNotes: [note, ...prev.loveNotes] }));
-              showToast('New sweet note added to the jar! 💌');
-            }}
-            onToggleFavorite={(id) => {
-              updateData((prev) => ({
-                ...prev,
-                loveNotes: prev.loveNotes.map((n) =>
-                  n.id === id ? { ...n, favorited: !n.favorited } : n
-                ),
-              }));
-            }}
-            showToast={showToast}
-          />
-        )}
 
         {view === 'analytics' && <AnalyticsView data={data} />}
       </main>
@@ -277,7 +250,7 @@ export default function App() {
           ['tasks', ClipboardList, 'Tasks'],
           ['syllabus', BookOpen, 'Portions'],
           ['desk', Bell, 'Desk'],
-          ['lovenotes', Heart, 'Love'],
+          ['notes', NotebookPen, 'Notes'],
         ].map(([key, Icon, label]) => (
           <button
             key={key as string}
@@ -292,6 +265,15 @@ export default function App() {
           </button>
         ))}
       </nav>
+
+      {/* Hearts Celebration & One-line Push Quote Fullscreen Overlay */}
+      {showHeartsCelebration && (
+        <HeartsCelebrationOverlay
+          quote={pushQuote}
+          onNextQuote={pickNewPushQuote}
+          onClose={() => setShowHeartsCelebration(false)}
+        />
+      )}
 
       {/* Toast Notification */}
       {toastMessage && (
@@ -343,10 +325,8 @@ function Sidebar({
     ['timetable', CalendarDays, 'Timetable', 'Mon–Sat'],
     ['tasks', ClipboardList, 'Tasks & Planner'],
     ['syllabus', BookOpen, 'Syllabus & Portions'],
-    ['desk', Bell, 'Teacher Desk', 'Timer/Log'],
     ['notes', NotebookPen, 'Quick Notes'],
     ['break', Gamepad2, 'Take a Break', 'Relax'],
-    ['lovenotes', Heart, 'Dummu’s Love Jar', '💗'],
     ['analytics', BarChart3, 'Weekly Pulse'],
   ];
 
@@ -420,15 +400,15 @@ function Sidebar({
 
 function DashboardView({
   data,
-  loveNote,
-  onPickLoveNote,
+  pushQuote,
+  onPickPushQuote,
   setView,
   updateData,
   showToast,
 }: {
   data: AppData;
-  loveNote: LoveNote;
-  onPickLoveNote: () => void;
+  pushQuote: string;
+  onPickPushQuote: () => void;
   setView: (v: View) => void;
   updateData: (updater: (prev: AppData) => AppData) => void;
   showToast: (msg: string) => void;
@@ -527,25 +507,25 @@ function DashboardView({
         </div>
       </div>
 
-      {/* Hero Section: Love Note + Stats */}
+      {/* Hero Section: Push Quote + Stats */}
       <div className="dashboard-hero">
         <section className="love-card-hero">
           <div className="love-top">
             <span className="love-tag">
-              <Heart size={12} fill="currentColor" /> Note from {loveNote.from}
+              <Heart size={12} fill="currentColor" /> Daily Push Quote
             </span>
             <button
               className="surprise-button"
-              onClick={onPickLoveNote}
-              title="Get another surprise note"
+              onClick={onPickPushQuote}
+              title="Get another quote from the 100 quotes"
             >
-              <RefreshCw size={12} /> Another note 💗
+              <RefreshCw size={12} /> Another quote 💗
             </button>
           </div>
-          <div className="love-quote">“{loveNote.message}”</div>
+          <div className="love-quote">“{pushQuote}”</div>
           <div className="love-bottom">
             <small>Cheering for you today & always</small>
-            <strong>With love, {loveNote.from} 💕</strong>
+            <strong>With endless love, Dummu 💕</strong>
           </div>
         </section>
 
@@ -600,8 +580,8 @@ function DashboardView({
           </div>
         </div>
         <div className="quick-tools-row">
-          <button className="quick-tool-btn" onClick={() => setView('desk')}>
-            <Bell size={14} /> Lecture Timer
+          <button className="quick-tool-btn" onClick={() => setView('notes')}>
+            <NotebookPen size={14} /> Quick Notes
           </button>
           <button className="quick-tool-btn" onClick={() => setView('timetable')}>
             <Calendar size={14} /> Timetable
@@ -891,14 +871,6 @@ function TimetableView({
                         </span>
                       )}
                     </div>
-
-                    <div className="slot-meta-col">
-                      {slot.room ? (
-                        <strong>{slot.room}</strong>
-                      ) : slot.type === 'free' ? (
-                        <span>Staff room</span>
-                      ) : null}
-                    </div>
                   </div>
                 );
               })}
@@ -1052,6 +1024,25 @@ function SyllabusView({
     showToast('New syllabus topic added! 📚');
   };
 
+  const handleAddUnit = (subjectId: string) => {
+    const sub = subjects.find((s) => s.id === subjectId);
+    if (!sub) return;
+    const nextNum = sub.units.length + 1;
+    const unitName = prompt(`Enter chapter/unit title:`, `Unit ${nextNum}: New Topic`);
+    if (!unitName || !unitName.trim()) return;
+    const newUnit: SyllabusUnit = {
+      id: `unit-${Date.now()}`,
+      subjectId,
+      unitNumber: nextNum,
+      name: unitName.trim(),
+      topics: [],
+    };
+    onUpdateSubjects(
+      subjects.map((s) => (s.id === subjectId ? { ...s, units: [...s.units, newUnit] } : s))
+    );
+    showToast(`Unit ${nextNum} added to ${sub.name}! 📚`);
+  };
+
   const filteredSubjects =
     activeSubjectId === 'all'
       ? subjects
@@ -1114,27 +1105,55 @@ function SyllabusView({
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: '10px',
+                justifyContent: 'space-between',
                 marginBottom: '14px',
               }}
             >
-              <span
-                style={{
-                  width: '12px',
-                  height: '12px',
-                  borderRadius: '50%',
-                  background: subject.color,
-                }}
-              />
-              <h3 style={{ fontFamily: 'var(--font-display)', fontSize: '22px' }}>
-                {subject.name}
-              </h3>
-              {subject.room && (
-                <span style={{ fontSize: '12px', color: 'var(--muted)' }}>
-                  · {subject.room}
-                </span>
-              )}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span
+                  style={{
+                    width: '12px',
+                    height: '12px',
+                    borderRadius: '50%',
+                    background: subject.color,
+                  }}
+                />
+                <h3 style={{ fontFamily: 'var(--font-display)', fontSize: '22px' }}>
+                  {subject.name}
+                </h3>
+              </div>
+              <button
+                className="secondary-button"
+                style={{ fontSize: '12px', padding: '6px 14px' }}
+                onClick={() => handleAddUnit(subject.id)}
+              >
+                <Plus size={13} /> Add Unit
+              </button>
             </div>
+
+            {subject.units.length === 0 && (
+              <div
+                style={{
+                  background: '#ffffff',
+                  border: '1px dashed var(--line)',
+                  borderRadius: 'var(--radius-md)',
+                  padding: '28px 20px',
+                  textAlign: 'center',
+                  marginBottom: '16px',
+                }}
+              >
+                <p style={{ color: 'var(--muted)', fontSize: '13px', marginBottom: '10px' }}>
+                  No portions or units added for {subject.name} yet.
+                </p>
+                <button
+                  className="primary-button"
+                  style={{ fontSize: '12.5px', margin: '0 auto', padding: '8px 16px' }}
+                  onClick={() => handleAddUnit(subject.id)}
+                >
+                  <Plus size={14} /> Add First Unit / Chapter
+                </button>
+              </div>
+            )}
 
             {subject.units.map((unit) => {
               const unitTotal = unit.topics.length;
@@ -1463,258 +1482,6 @@ function TasksView({
 }
 
 /* ==========================================================================
-   Teacher Desk Tools: Class Bell & Attendance Log
-   ========================================================================== */
-
-function TeacherDeskView({
-  attendanceLogs,
-  onUpdateAttendance,
-  showToast,
-}: {
-  attendanceLogs: AttendanceRecord[];
-  onUpdateAttendance: (logs: AttendanceRecord[]) => void;
-  showToast: (msg: string) => void;
-}) {
-  // Timer State
-  const [timerSeconds, setTimerSeconds] = useState(45 * 60); // 45 min default
-  const [totalSeconds, setTotalSeconds] = useState(45 * 60);
-  const [isRunning, setIsRunning] = useState(false);
-
-  // Attendance Form State
-  const [className, setClassName] = useState('ID1');
-  const [absentRolls, setAbsentRolls] = useState('');
-  const [topicTaught, setTopicTaught] = useState('');
-
-  useEffect(() => {
-    let interval: any = null;
-    if (isRunning && timerSeconds > 0) {
-      interval = setInterval(() => {
-        setTimerSeconds((prev) => {
-          if (prev <= 1) {
-            clearInterval(interval);
-            setIsRunning(false);
-            playGentleChime('bell');
-            triggerConfetti();
-            showToast('Class period completed! 🔔');
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-    }
-    return () => clearInterval(interval);
-  }, [isRunning, timerSeconds]);
-
-  const setPreset = (mins: number) => {
-    setIsRunning(false);
-    setTimerSeconds(mins * 60);
-    setTotalSeconds(mins * 60);
-  };
-
-  const handleSaveAttendance = (e: FormEvent) => {
-    e.preventDefault();
-    if (!absentRolls.trim() && !topicTaught.trim()) return;
-    const newRecord: AttendanceRecord = {
-      id: `att-${Date.now()}`,
-      date: new Date().toISOString().slice(0, 10),
-      periodTime: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      className,
-      absentRolls: absentRolls.trim() || 'None (All Present)',
-      topicTaught: topicTaught.trim(),
-      createdAt: new Date().toISOString(),
-    };
-    onUpdateAttendance([newRecord, ...attendanceLogs]);
-    setAbsentRolls('');
-    setTopicTaught('');
-    showToast('Class roll record saved! 📋');
-  };
-
-  const deleteAttendance = (id: string) => {
-    onUpdateAttendance(attendanceLogs.filter((l) => l.id !== id));
-    showToast('Log entry deleted.');
-  };
-
-  return (
-    <div>
-      <div className="page-header">
-        <div>
-          <div className="eyebrow">
-            <Bell size={14} /> Everyday Teaching Tools
-          </div>
-          <h2>Teacher Desk</h2>
-          <p>Class timer with singing bowl bell chime and quick pocket attendance register.</p>
-        </div>
-      </div>
-
-      <div className="desk-grid">
-        {/* Class Timer Card */}
-        <section className="timer-card">
-          <div className="eyebrow">
-            <Clock size={13} /> Lecture Bell & Timer
-          </div>
-          <h3 style={{ fontFamily: 'var(--font-display)', fontSize: '22px' }}>
-            Class Period Timer
-          </h3>
-          <p style={{ color: 'var(--muted)', fontSize: '13px', margin: '4px 0 16px' }}>
-            A gentle reminder when the period or experiment wraps up.
-          </p>
-
-          <div className="timer-presets">
-            <button
-              className={`timer-preset-btn ${totalSeconds === 45 * 60 ? 'active' : ''}`}
-              onClick={() => setPreset(45)}
-            >
-              45m Lecture
-            </button>
-            <button
-              className={`timer-preset-btn ${totalSeconds === 50 * 60 ? 'active' : ''}`}
-              onClick={() => setPreset(50)}
-            >
-              50m Lab
-            </button>
-            <button
-              className={`timer-preset-btn ${totalSeconds === 15 * 60 ? 'active' : ''}`}
-              onClick={() => setPreset(15)}
-            >
-              15m Quiz / Recap
-            </button>
-            <button
-              className={`timer-preset-btn ${totalSeconds === 5 * 60 ? 'active' : ''}`}
-              onClick={() => setPreset(5)}
-            >
-              5m Quick Break
-            </button>
-          </div>
-
-          <div className="timer-circle-wrapper">
-            <div className="timer-display">{formatTimeRemaining(timerSeconds)}</div>
-          </div>
-
-          <div className="timer-controls">
-            <button
-              className="primary-button"
-              onClick={() => setIsRunning(!isRunning)}
-            >
-              {isRunning ? <Pause size={16} /> : <Play size={16} />}
-              <span>{isRunning ? 'Pause' : 'Start Timer'}</span>
-            </button>
-            <button
-              className="secondary-button"
-              onClick={() => {
-                setIsRunning(false);
-                setTimerSeconds(totalSeconds);
-              }}
-            >
-              <RotateCcw size={15} /> Reset
-            </button>
-            <button
-              className="secondary-button"
-              onClick={() => playGentleChime('bell')}
-              title="Test chime sound"
-            >
-              <Bell size={15} /> Bell
-            </button>
-          </div>
-        </section>
-
-        {/* Quick Attendance / Spot Log */}
-        <section className="attendance-card">
-          <div className="eyebrow">
-            <UserCheck size={13} /> Roll Call Scratchpad
-          </div>
-          <h3 style={{ fontFamily: 'var(--font-display)', fontSize: '22px', marginBottom: '4px' }}>
-            Quick Attendance Log
-          </h3>
-          <p style={{ color: 'var(--muted)', fontSize: '13px', marginBottom: '16px' }}>
-            Quickly note absentees and portions taught without opening heavy books.
-          </p>
-
-          <form onSubmit={handleSaveAttendance} className="attendance-form">
-            <div className="input-row-half">
-              <div>
-                <label style={{ fontSize: '11px', color: 'var(--muted)', display: 'block', marginBottom: '3px' }}>
-                  Class
-                </label>
-                <select
-                  className="styled-select"
-                  value={className}
-                  onChange={(e) => setClassName(e.target.value)}
-                >
-                  <option value="ID1">Section ID1</option>
-                  <option value="ID2">Section ID2</option>
-                  <option value="LAB">Physics Lab (Batch A/B)</option>
-                </select>
-              </div>
-              <div>
-                <label style={{ fontSize: '11px', color: 'var(--muted)', display: 'block', marginBottom: '3px' }}>
-                  Absent Roll Numbers
-                </label>
-                <input
-                  className="styled-input"
-                  placeholder="e.g. 7, 14, 29"
-                  value={absentRolls}
-                  onChange={(e) => setAbsentRolls(e.target.value)}
-                />
-              </div>
-            </div>
-
-            <div>
-              <label style={{ fontSize: '11px', color: 'var(--muted)', display: 'block', marginBottom: '3px' }}>
-                Topic Taught / Remarks
-              </label>
-              <input
-                className="styled-input"
-                placeholder="e.g. Solved problem 3 on circular motion; practical #4 done."
-                value={topicTaught}
-                onChange={(e) => setTopicTaught(e.target.value)}
-              />
-            </div>
-
-            <button className="primary-button" type="submit" style={{ justifySelf: 'start' }}>
-              Save Entry
-            </button>
-          </form>
-
-          <div style={{ maxHeight: '260px', overflowY: 'auto' }}>
-            {attendanceLogs.map((log) => (
-              <div className="log-item" key={log.id}>
-                <div className="log-item-top">
-                  <strong>
-                    {log.className} · {log.periodTime}
-                  </strong>
-                  <span style={{ fontSize: '11px', color: 'var(--muted)' }}>{log.date}</span>
-                </div>
-                <p>
-                  <strong>Absentees:</strong> {log.absentRolls}
-                </p>
-                {log.topicTaught && (
-                  <p style={{ marginTop: '3px' }}>
-                    <strong>Covered:</strong> {log.topicTaught}
-                  </p>
-                )}
-                <div style={{ textAlign: 'right', marginTop: '4px' }}>
-                  <button
-                    style={{ fontSize: '11px', color: 'var(--rose-dark)' }}
-                    onClick={() => deleteAttendance(log.id)}
-                  >
-                    Remove
-                  </button>
-                </div>
-              </div>
-            ))}
-            {attendanceLogs.length === 0 && (
-              <p style={{ fontSize: '12.5px', color: 'var(--muted)', textAlign: 'center', padding: '16px 0' }}>
-                No attendance entries logged today yet.
-              </p>
-            )}
-          </div>
-        </section>
-      </div>
-    </div>
-  );
-}
-
-/* ==========================================================================
    Quick Notes View
    ========================================================================== */
 
@@ -1861,6 +1628,12 @@ function QuickNotesView({
             </div>
           </article>
         ))}
+        {filtered.length === 0 && (
+          <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--muted)', gridColumn: '1 / -1' }}>
+            <NotebookPen size={36} style={{ color: 'var(--rose)', marginBottom: '8px' }} />
+            <p>No notes written yet. Jot down student reminders, lab prep, or ideas above! 🌸</p>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -2136,135 +1909,87 @@ function BreakView({ showToast }: { showToast: (msg: string) => void }) {
    💌 Love Notes & Dummu's Jar View
    ========================================================================== */
 
-function LoveNotesView({
-  loveNotes,
-  onPickSurprise,
-  onAddLoveNote,
-  onToggleFavorite,
-  showToast,
+/* ==========================================================================
+   💖 Hearts Screen Celebration & Push Quote Overlay
+   ========================================================================== */
+
+function HeartsCelebrationOverlay({
+  quote,
+  onNextQuote,
+  onClose,
 }: {
-  loveNotes: LoveNote[];
-  onPickSurprise: () => void;
-  onAddLoveNote: (note: LoveNote) => void;
-  onToggleFavorite: (id: string) => void;
-  showToast: (msg: string) => void;
+  quote: string;
+  onNextQuote: () => void;
+  onClose: () => void;
 }) {
-  const [newMsg, setNewMsg] = useState('');
-  const [author, setAuthor] = useState<'Prabhanjan' | 'Dummu' | 'Baby'>('Dummu');
-
-  const handleAdd = (e: FormEvent) => {
-    e.preventDefault();
-    if (!newMsg.trim()) return;
-    const note: LoveNote = {
-      id: `love-${Date.now()}`,
-      from: author,
-      message: newMsg.trim(),
-      date: new Date().toISOString().slice(0, 10),
-      favorited: false,
-    };
-    onAddLoveNote(note);
-    setNewMsg('');
-  };
-
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard?.writeText(text);
-    showToast('Quote copied to clipboard! 📋');
-  };
+  useEffect(() => {
+    triggerScreenHeartsExplosion();
+  }, []);
 
   return (
-    <div>
-      <div className="page-header">
-        <div>
-          <div className="eyebrow">
-            <Heart size={14} fill="currentColor" /> Private Love Notes
-          </div>
-          <h2>Dummu's Love Jar</h2>
-          <p>Little reminders from Prabhanjan that you are cherished, admired, and never alone.</p>
-        </div>
+    <div className="hearts-screen-overlay" onClick={onClose}>
+      {/* Floating Animated Hearts Filling the Screen */}
+      <div className="floating-hearts-container">
+        {Array.from({ length: 45 }).map((_, i) => (
+          <svg
+            key={i}
+            className="floating-heart-particle"
+            style={{
+              left: `${(i * 2.22 + (i % 7) * 2.8) % 96}%`,
+              width: `${16 + (i % 5) * 8}px`,
+              height: `${16 + (i % 5) * 8}px`,
+              animationDelay: `${(i * 0.08).toFixed(2)}s`,
+              animationDuration: `${3.2 + (i % 5) * 0.75}s`,
+              color: [
+                '#ff4d79',
+                '#e85d82',
+                '#ff8fae',
+                '#ffb3c6',
+                '#ff6584',
+                '#ffd1dc',
+                '#ff1744',
+              ][i % 7],
+            }}
+            viewBox="0 0 24 24"
+            fill="currentColor"
+          >
+            <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+          </svg>
+        ))}
       </div>
 
-      <section className="love-jar-hero">
-        <div className="love-jar-icon">🍯💗</div>
-        <h3>Preethi’s Jar of Warmth</h3>
-        <p>
-          Whenever teaching gets tiring or you need a little smile, dip into the jar. Someone is
-          head over heels in love with you!
-        </p>
-        <button
-          className="primary-button"
-          onClick={onPickSurprise}
-          style={{ fontSize: '14px', padding: '12px 22px' }}
-        >
-          <Sparkles size={16} /> Pull a Surprise Love Note 💗
-        </button>
-      </section>
+      <div className="quote-celebration-card" onClick={(e) => e.stopPropagation()}>
+        <div className="quote-celebration-icon">
+          <Heart size={36} fill="currentColor" />
+        </div>
+        <div className="quote-tag-badge">
+          <Sparkles size={13} /> Daily Push Quote For Preethi
+        </div>
+        <div className="quote-celebration-text">“{quote}”</div>
+        <div className="quote-celebration-sub">
+          With endless love &amp; pride, <strong>your Dummu 💕</strong>
+        </div>
 
-      {/* Add note to jar */}
-      <section className="panel" style={{ marginBottom: '24px' }}>
-        <h4 style={{ fontFamily: 'var(--font-display)', fontSize: '18px', marginBottom: '10px' }}>
-          Drop a New Note into the Jar
-        </h4>
-        <form onSubmit={handleAdd}>
-          <div style={{ display: 'grid', gap: '10px' }}>
-            <textarea
-              className="styled-textarea"
-              placeholder="Write a sweet reminder or quote for Preethi..."
-              rows={2}
-              value={newMsg}
-              onChange={(e) => setNewMsg(e.target.value)}
-              required
-            />
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <select
-                className="styled-select"
-                style={{ width: '160px' }}
-                value={author}
-                onChange={(e) => setAuthor(e.target.value as any)}
-              >
-                <option value="Dummu">From: Dummu</option>
-                <option value="Prabhanjan">From: Prabhanjan</option>
-                <option value="Baby">From: Baby</option>
-              </select>
-              <button className="primary-button" type="submit">
-                Add to Jar 💌
-              </button>
-            </div>
-          </div>
-        </form>
-      </section>
-
-      {/* Grid of Love Notes */}
-      <div className="love-notes-grid">
-        {loveNotes.map((note) => (
-          <article className="love-note-item" key={note.id}>
-            <p>“{note.message}”</p>
-            <div className="love-note-author">
-              <span>
-                With love, <strong>{note.from}</strong>
-              </span>
-              <div style={{ display: 'flex', gap: '6px' }}>
-                <button
-                  className="icon-button"
-                  onClick={() => copyToClipboard(note.message)}
-                  title="Copy note"
-                >
-                  <Copy size={13} />
-                </button>
-                <button
-                  className="icon-button"
-                  onClick={() => onToggleFavorite(note.id)}
-                  title={note.favorited ? 'Favorited' : 'Favorite'}
-                >
-                  <Heart
-                    size={14}
-                    fill={note.favorited ? 'var(--rose)' : 'none'}
-                    color="var(--rose)"
-                  />
-                </button>
-              </div>
-            </div>
-          </article>
-        ))}
+        <div className="quote-celebration-actions">
+          <button
+            className="quote-btn-next"
+            onClick={(e) => {
+              e.stopPropagation();
+              onNextQuote();
+            }}
+          >
+            <RefreshCw size={15} /> Another Quote ✨
+          </button>
+          <button
+            className="quote-btn-close"
+            onClick={(e) => {
+              e.stopPropagation();
+              onClose();
+            }}
+          >
+            Start My Day 🌸 <ArrowRight size={16} />
+          </button>
+        </div>
       </div>
     </div>
   );

@@ -46,12 +46,39 @@ export function triggerConfetti() {
 export function triggerHearts() {
   try {
     confetti({
-      particleCount: 35,
-      spread: 60,
+      particleCount: 45,
+      spread: 70,
       origin: { y: 0.7 },
-      colors: ['#e85d82', '#ff4d79', '#ff8fae', '#ffdbe4'],
+      colors: ['#e85d82', '#ff4d79', '#ff8fae', '#ffdbe4', '#ff1744'],
       shapes: ['circle'],
     });
+  } catch {
+    // fallback
+  }
+}
+
+export function triggerScreenHeartsExplosion() {
+  try {
+    // Multi-angle festive explosion of hearts/colors filling the screen
+    const count = 200;
+    const defaults = {
+      origin: { y: 0.7 },
+      colors: ['#ff4d79', '#e85d82', '#ff8fae', '#ffdbe4', '#ff0055', '#ff70a6'],
+    };
+
+    function fire(particleRatio: number, opts: confetti.Options) {
+      confetti({
+        ...defaults,
+        ...opts,
+        particleCount: Math.floor(count * particleRatio),
+      });
+    }
+
+    fire(0.25, { spread: 26, startVelocity: 55, origin: { y: 0.6 } });
+    fire(0.2, { spread: 60, origin: { y: 0.7 } });
+    fire(0.35, { spread: 100, decay: 0.91, scalar: 0.8, origin: { y: 0.65 } });
+    fire(0.1, { spread: 120, startVelocity: 25, decay: 0.92, scalar: 1.2, origin: { y: 0.7 } });
+    fire(0.1, { spread: 120, startVelocity: 45, origin: { y: 0.6 } });
   } catch {
     // fallback
   }
@@ -114,7 +141,7 @@ export function getCurrentAndNextClass(timetable: WeeklyTimetable): {
     } else if (currentSlot.type === 'free') {
       statusText = 'Currently: Free period · Preparation or tea breather';
     } else {
-      statusText = `Currently in class: ${currentSlot.subject} (${currentSlot.time})${currentSlot.room ? ` · ${currentSlot.room}` : ''}`;
+      statusText = `Currently in class: ${currentSlot.subject} (${currentSlot.time})`;
     }
   } else if (nextSlot) {
     statusText = `Next up: ${nextSlot.subject || 'Free Period'} at ${nextSlot.startTime}`;
