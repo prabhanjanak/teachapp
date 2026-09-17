@@ -75,6 +75,7 @@ import {
   triggerScreenHeartsExplosion
 } from './utils';
 import { getRandomPreethiQuote } from './quotes';
+import MouseEffects from './components/originkit/ui/clickeffects';
 
 export default function App() {
   const [token, setToken] = useState<string | null>(() => getAuthSession());
@@ -299,6 +300,18 @@ export default function App() {
           <span>✨</span> {toastMessage}
         </div>
       )}
+
+      {/* Originkit Interactive Click Effects */}
+      <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 9990, overflow: 'hidden' }}>
+        <MouseEffects
+          showLabel={false}
+          color="#e85d82"
+          interactionMode="rings"
+          strokeWidth={2.5}
+          duration={0.4}
+          effectSize={70}
+        />
+      </div>
     </div>
   );
 }
@@ -2179,6 +2192,17 @@ function LoginView({ onLogin }: { onLogin: (token: string) => void }) {
         >
           <Sparkles size={14} /> Quick One-Click Unlock (Preethi 💗)
         </button>
+      </div>
+
+      <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 9990, overflow: 'hidden' }}>
+        <MouseEffects
+          showLabel={false}
+          color="#e85d82"
+          interactionMode="rings"
+          strokeWidth={2.5}
+          duration={0.4}
+          effectSize={70}
+        />
       </div>
     </div>
   );

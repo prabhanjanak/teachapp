@@ -15,3 +15,4 @@ server/dist
 *.tsbuildinfo
 .vscode
 .vercel
+.originkit
